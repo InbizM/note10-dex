@@ -1,10 +1,10 @@
 # Build artifacts
 *.apk
-obj/
-dex/
-bridge_build/
-bin/
-src/**/R.java
+/obj/
+/dex/
+/bridge_build/
+/bin/
+**/R.java
 
 # IDE & Editor
 .idea/
