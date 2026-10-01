@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Root: fills entire window, black background, centres child -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black">
+
+    <!--
+        AspectRatioFrameLayout shrinks itself to the correct video ratio and is
+        centred by the FrameLayout gravity.  The SurfaceView inside it fills 100%
+        of the frame, so MediaCodec renders to exactly the right number of pixels.
+    -->
+    <com.dex.note10.AspectRatioFrameLayout
+        android:id="@+id/aspect_frame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center">
+
+        <SurfaceView
+            android:id="@+id/surface_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </com.dex.note10.AspectRatioFrameLayout>
+
+    <!-- Connection / Status overlay — centred over everything -->
+    <LinearLayout
+        android:id="@+id/layout_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="20dp"
+        android:background="@drawable/status_bg">
+
+        <ProgressBar
+            android:id="@+id/progress_bar"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:indeterminate="true" />
+
+        <TextView
+            android:id="@+id/text_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:text="@string/connecting"
+            android:gravity="center" />
+
+    </LinearLayout>
+
+</FrameLayout>

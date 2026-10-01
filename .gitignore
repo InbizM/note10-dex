@@ -1,0 +1,18 @@
+# Build artifacts
+*.apk
+obj/
+dex/
+bridge_build/
+bin/
+src/**/R.java
+
+# IDE & Editor
+.idea/
+*.iml
+.gradle/
+build/
+local.properties
+
+# OS files
+.DS_Store
+Thumbs.db
