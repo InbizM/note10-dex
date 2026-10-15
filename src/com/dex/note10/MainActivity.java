@@ -75,6 +75,7 @@ public class MainActivity extends Activity implements StreamManager.Listener {
             @Override
             public void surfaceDestroyed(SurfaceHolder holder) {
                 StreamManager.getInstance().setListener(null);
+                StreamManager.getInstance().stop();
             }
         });
     }

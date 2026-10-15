@@ -28,6 +28,7 @@ public class StreamManager implements ScrcpyClient.Listener {
     private String lastDeviceName = "Note 10";
     private boolean connected = false;
     private String lastStatus = "Conectando...";
+    String cachedIp = null; // last working IP, skip scan on reconnect
 
     private StreamManager() {}
 
@@ -83,7 +84,7 @@ public class StreamManager implements ScrcpyClient.Listener {
 
         Log.i(TAG, "Starting new scrcpy session");
         connected = false;
-        scrcpyClient = new ScrcpyClient(context.getApplicationContext(), this, controlSender);
+        scrcpyClient = new ScrcpyClient(context.getApplicationContext(), this, controlSender, cachedIp);
         scrcpyClient.start(surface);
     }
 
@@ -108,6 +109,7 @@ public class StreamManager implements ScrcpyClient.Listener {
         this.lastWidth = width;
         this.lastHeight = height;
         this.connected = true;
+        if (scrcpyClient != null) cachedIp = scrcpyClient.getTargetIp();
         Listener l = currentListener;
         if (l != null) l.onConnected(deviceName, width, height);
     }

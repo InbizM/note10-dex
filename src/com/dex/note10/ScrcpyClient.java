@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -24,10 +25,11 @@ import java.util.concurrent.TimeUnit;
  */
 public class ScrcpyClient {
     private static final String TAG = "ScrcpyClient";
-    public static final String TARGET_IP = "192.168.18.123";
-    public static final int TARGET_PORT = 5555;        // ADB port
+    public static final int TARGET_PORT = 5551;        // ADB port
     public static final int TCP_BRIDGE_PORT = 27183;   // Direct TCP video/control port
     public static final int TCP_AUDIO_PORT = 27184;    // Direct TCP audio port
+
+    private volatile String targetIp;
 
     public interface Listener {
         void onStatusUpdate(String status);
@@ -49,11 +51,14 @@ public class ScrcpyClient {
     private Socket videoSocket;
     private Socket controlSocket;
 
-    public ScrcpyClient(Context context, Listener listener, ControlSender controlSender) {
+    public ScrcpyClient(Context context, Listener listener, ControlSender controlSender, String hintIp) {
         this.context = context;
         this.listener = listener;
         this.controlSender = controlSender;
+        this.targetIp = hintIp;
     }
+
+    public String getTargetIp() { return targetIp; }
 
     public synchronized boolean isRunning() {
         return running;
@@ -91,11 +96,28 @@ public class ScrcpyClient {
     private void connectionLoop() {
         while (running) {
             try {
-                // ============ PHASE 1: ADB setup ============
-                listener.onStatusUpdate("Conectando ADB...");
+                // ============ PHASE 0: Find target IP via port scan ============
                 AdbCrypto crypto = getOrCreateCrypto(context);
 
-                Socket adbSocket = new Socket(TARGET_IP, TARGET_PORT);
+                if (targetIp == null) {
+                    List<String> candidates = DeviceScanner.scan(context,
+                            msg -> listener.onStatusUpdate(msg));
+                    if (candidates.isEmpty()) {
+                        listener.onStatusUpdate("Reescaneando en 5 segundos...");
+                        Thread.sleep(5000);
+                        continue;
+                    }
+                    // Try each candidate; the first one that completes ADB handshake wins
+                    targetIp = candidates.get(0);
+                    listener.onStatusUpdate("Intentando " + targetIp + "...");
+                }
+
+                // ============ PHASE 1: ADB setup ============
+                listener.onStatusUpdate("Conectando ADB a " + targetIp + "...");
+
+                int adbPort = DeviceScanner.findAdbPort(targetIp, 1500);
+                if (adbPort < 0) adbPort = TARGET_PORT;
+                Socket adbSocket = new Socket(targetIp, adbPort);
                 adbSocket.setTcpNoDelay(true);
                 adbConn = AdbConnection.create(adbSocket, crypto);
                 adbConn.connect(15000, TimeUnit.MILLISECONDS, false);
@@ -137,7 +159,7 @@ public class ScrcpyClient {
                 listener.onStatusUpdate("Conectando video directo...");
 
                 // Video connection (first)
-                videoSocket = new Socket(TARGET_IP, TCP_BRIDGE_PORT);
+                videoSocket = new Socket(targetIp, TCP_BRIDGE_PORT);
                 videoSocket.setTcpNoDelay(true);
                 videoSocket.setReceiveBufferSize(262144);
                 BufferedInputStream videoIn = new BufferedInputStream(videoSocket.getInputStream(), 131072);
@@ -148,7 +170,7 @@ public class ScrcpyClient {
 
                 // Control connection (second)
                 listener.onStatusUpdate("Conectando control...");
-                controlSocket = new Socket(TARGET_IP, TCP_BRIDGE_PORT);
+                controlSocket = new Socket(targetIp, TCP_BRIDGE_PORT);
                 controlSocket.setTcpNoDelay(true);
                 controlSender.setControlOutput(new BufferedOutputStream(controlSocket.getOutputStream(), 4096));
 
@@ -177,7 +199,7 @@ public class ScrcpyClient {
 
                 // 5. Start real-time audio playback
                 if (audioPlayer != null) audioPlayer.stop();
-                audioPlayer = new AudioPlayer(TARGET_IP, TCP_AUDIO_PORT);
+                audioPlayer = new AudioPlayer(targetIp, TCP_AUDIO_PORT);
                 audioPlayer.start();
 
                 // 6. Read and feed video frames — at full TCP speed!
@@ -204,6 +226,8 @@ public class ScrcpyClient {
                 Log.e(TAG, "Connection error", e);
                 controlSender.setControlOutput(null);
                 if (audioPlayer != null) { audioPlayer.stop(); audioPlayer = null; }
+                // Reset IP so next iteration re-scans (device may have gotten a new DHCP address)
+                targetIp = null;
                 if (running) {
                     listener.onDisconnected("Reconectando...");
                     try { Thread.sleep(1000); } catch (InterruptedException ignored) { break; }
